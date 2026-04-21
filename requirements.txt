@@ -1,0 +1,10 @@
+Flask
+Flask-Cors
+google-genai
+python-dotenv
+requests
+feedparser
+Flask-SQLAlchemy
+Flask-Login
+Flask-Bcrypt
+gunicorn
