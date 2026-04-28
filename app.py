@@ -15,8 +15,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from datetime import timedelta
 
 load_dotenv()
-
-frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend')
+frontend_dir = os.path.dirname(os.path.abspath(__file__)) 
 app = Flask(__name__, static_folder=frontend_dir, static_url_path='')
 CORS(app, supports_credentials=True)
 
