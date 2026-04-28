@@ -927,13 +927,11 @@ body {
 ================================ */
 @media (max-width: 768px) {
 
-    /* Body */
     body {
         height: 100dvh;
         overflow: hidden;
     }
 
-    /* Top Nav — compact single row */
     .top-nav {
         height: auto;
         padding: 10px 14px;
@@ -946,7 +944,6 @@ body {
         background: var(--bg-panel);
     }
 
-    /* Hide desktop nav tabs — replaced by bottom bar */
     .nav-tabs {
         display: none;
     }
@@ -955,17 +952,15 @@ body {
         padding: 3px 5px;
     }
 
-    /* App container: full screen column */
     .app-container {
         flex-direction: column;
         padding: 0;
         gap: 0;
-        height: calc(100dvh - 53px - 56px); /* nav + bottom bar */
+        height: calc(100dvh - 53px - 56px);
         overflow: hidden;
         position: relative;
     }
 
-    /* Sidebars hidden by default, slide in as overlay */
     .left-sidebar,
     .right-sidebar {
         display: none;
@@ -984,13 +979,12 @@ body {
         padding: 16px;
     }
 
-    /* Toggle open via JS */
     .left-sidebar.mobile-open,
     .right-sidebar.mobile-open {
         display: flex;
     }
 
-    /* Main chat fills all space */
+    /* ✅ FIX: proper flex column so input never goes behind bottom nav */
     .chat-container {
         flex: 1;
         border-radius: 0;
@@ -998,18 +992,55 @@ body {
         min-height: 0;
         height: 100%;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
     }
 
     .chat-wrapper {
-        height: 100%;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
     }
 
+    /* chat-box scrolls, input-area stays pinned */
     .chat-box {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
         padding: 14px 12px;
         gap: 16px;
     }
 
-    /* Welcome screen */
+    /* ✅ KEY FIX: input pinned, never hidden behind bottom nav */
+    .input-area {
+        flex-shrink: 0;
+        padding: 10px 12px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+        background: var(--bg-panel);
+        border-top: 1px solid var(--border-color);
+    }
+
+    #chat-form {
+        padding: 6px 6px 6px 14px;
+        border-radius: 24px;
+        gap: 8px;
+    }
+
+    #user-input {
+        font-size: 16px;
+    }
+
+    #send-btn {
+        width: 38px;
+        height: 38px;
+    }
+
+    .chat-icon {
+        display: none;
+    }
+
     .welcome-screen {
         padding-top: 4vh !important;
         max-width: 280px !important;
@@ -1026,7 +1057,6 @@ body {
         margin-bottom: 0 !important;
     }
 
-    /* Messages */
     .message {
         max-width: 88%;
         font-size: 14px;
@@ -1053,39 +1083,10 @@ body {
         font-size: 10px;
     }
 
-    /* Always show action buttons on mobile (no hover) */
     .msg-actions {
         opacity: 1;
     }
 
-    /* Input area */
-    .input-area {
-        padding: 10px 12px;
-        padding-bottom: max(10px, env(safe-area-inset-bottom));
-        background: var(--bg-panel);
-        border-top: 1px solid var(--border-color);
-    }
-
-    #chat-form {
-        padding: 6px 6px 6px 14px;
-        border-radius: 24px;
-        gap: 8px;
-    }
-
-    #user-input {
-        font-size: 16px; /* prevents iOS auto-zoom */
-    }
-
-    #send-btn {
-        width: 38px;
-        height: 38px;
-    }
-
-    .chat-icon {
-        display: none; /* save space on mobile */
-    }
-
-    /* All news (For You tab) */
     .all-news-container {
         padding-bottom: 8px;
     }
@@ -1106,7 +1107,7 @@ body {
         border-radius: 8px;
     }
 
-    /* ── Mobile Bottom Navigation Bar ── */
+    /* Mobile Bottom Navigation Bar */
     .mobile-bottom-nav {
         display: flex !important;
         position: fixed;
