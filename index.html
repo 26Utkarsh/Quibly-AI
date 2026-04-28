@@ -72,7 +72,7 @@
                 <div class="input-area">
                     <form id="chat-form">
                         <span class="chat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>
-                        <input type="text" id="user-input" placeholder="Enter a headline or ask a question..." autocomplete="off">
+                        <input type="text" id="user-input" placeholder="Enter a headline or ask anything..." autocomplete="off">
                         <button type="submit" id="send-btn">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -96,6 +96,104 @@
         </aside>
     </div>
 
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav">
+        <button class="mobile-nav-btn active" id="mob-chat-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            Chat
+        </button>
+        <button class="mobile-nav-btn" id="mob-foryou-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+            For You
+        </button>
+        <button class="mobile-nav-btn" id="mob-news-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 0-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"></path><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"></path></svg>
+            News
+        </button>
+        <button class="mobile-nav-btn" id="mob-history-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            History
+        </button>
+        <button class="mobile-nav-btn" id="mob-newchat-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            New
+        </button>
+    </nav>
+
     <script src="script.js"></script>
+
+    <!-- Mobile navigation logic -->
+    <script>
+    (function() {
+        const isMobile = () => window.innerWidth <= 768;
+
+        const mobChat    = document.getElementById('mob-chat-btn');
+        const mobForYou  = document.getElementById('mob-foryou-btn');
+        const mobNews    = document.getElementById('mob-news-btn');
+        const mobHistory = document.getElementById('mob-history-btn');
+        const mobNew     = document.getElementById('mob-newchat-btn');
+
+        const leftSidebar  = document.querySelector('.left-sidebar');
+        const rightSidebar = document.querySelector('.right-sidebar');
+        const chatContainer = document.querySelector('.chat-container');
+
+        // Tab references (desktop tabs — we piggyback their click)
+        const tabTrending   = document.getElementById('tab-trending');
+        const tabBookmarks  = document.getElementById('tab-bookmarks');
+        const navNewChat    = document.getElementById('nav-new-chat-btn');
+
+        function setActive(btn) {
+            [mobChat, mobForYou, mobNews, mobHistory, mobNew].forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        function closeAll() {
+            leftSidebar.classList.remove('mobile-open');
+            rightSidebar.classList.remove('mobile-open');
+        }
+
+        mobChat.addEventListener('click', () => {
+            if (!isMobile()) return;
+            closeAll();
+            setActive(mobChat);
+        });
+
+        mobForYou.addEventListener('click', () => {
+            if (!isMobile()) return;
+            closeAll();
+            setActive(mobForYou);
+            // Trigger the existing For You tab
+            if (tabTrending) tabTrending.click();
+        });
+
+        mobNews.addEventListener('click', () => {
+            if (!isMobile()) return;
+            closeAll();
+            setActive(mobNews);
+            rightSidebar.classList.add('mobile-open');
+        });
+
+        mobHistory.addEventListener('click', () => {
+            if (!isMobile()) return;
+            const isOpen = leftSidebar.classList.contains('mobile-open');
+            closeAll();
+            if (!isOpen) {
+                leftSidebar.classList.add('mobile-open');
+                setActive(mobHistory);
+            } else {
+                setActive(mobChat);
+            }
+        });
+
+        mobNew.addEventListener('click', () => {
+            if (!isMobile()) return;
+            closeAll();
+            setActive(mobChat);
+            // Trigger new chat
+            const newChatBtn = document.getElementById('new-chat-btn');
+            if (newChatBtn) newChatBtn.click();
+        });
+    })();
+    </script>
 </body>
 </html>
