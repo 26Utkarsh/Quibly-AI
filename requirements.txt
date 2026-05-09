@@ -1,6 +1,6 @@
 Flask
 Flask-Cors
-google-genai
+groq
 python-dotenv
 requests
 feedparser
