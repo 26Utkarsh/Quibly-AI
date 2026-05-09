@@ -6,8 +6,7 @@ import feedparser
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+from groq import Groq
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
@@ -15,7 +14,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from datetime import timedelta
 
 load_dotenv()
-frontend_dir = os.path.dirname(os.path.abspath(__file__)) 
+frontend_dir = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=frontend_dir, static_url_path='')
 CORS(app, supports_credentials=True)
 
@@ -59,18 +58,18 @@ def register():
     password = data.get('password')
     if not username or not password:
         return jsonify({'error': 'Gmail address and password required'}), 400
-        
+
     if not username.endswith('@gmail.com'):
         return jsonify({'error': 'Please sign up using your Gmail address (@gmail.com)'}), 400
-    
+
     if User.query.filter_by(username=username).first():
         return jsonify({'error': 'Username already exists'}), 400
-        
+
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
     new_user = User(username=username, password=hashed_password)
     db.session.add(new_user)
     db.session.commit()
-    
+
     login_user(new_user, remember=True)
     return jsonify({'message': 'Registration successful', 'username': username})
 
@@ -95,68 +94,34 @@ def auth_status():
         return jsonify({'authenticated': True, 'username': current_user.username})
     return jsonify({'authenticated': False})
 
-GEMINI_API_KEY_PRIMARY = os.getenv('GEMINI_API_KEY_PRIMARY', '')
-GEMINI_API_KEY_SECONDARY = os.getenv('GEMINI_API_KEY_SECONDARY', '')
-
-# Build list of active clients (primary first, secondary fallback)
-api_clients = []
-for key in [GEMINI_API_KEY_PRIMARY, GEMINI_API_KEY_SECONDARY]:
-    if key.strip() and key != 'your_gemini_api_key_here':
-        api_clients.append(genai.Client(api_key=key))
-
-client = api_clients[0] if api_clients else None
+# Groq client setup
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
+client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY.strip() else None
 
 def get_fallback_analysis(headline):
-    return f"""**Notice: Gemini API Key Not Configured**
+    return f"""**Notice: Groq API Key Not Configured**
 
-Please configure your Gemini API Key in the `.env` file to enable AI contextual analysis. 
+Please configure your Groq API Key in the `.env` file to enable AI contextual analysis.
 
 Current Headline: "{headline}"
 
 *Without an API key, QUIBLY cannot infer missing context or provide detailed explanations.*"""
 
-
 def get_fallback_chat(message):
-    return "**Notice: Gemini API Key Not Configured**\n\nPlease add your API key to chat."
-
-
-def call_with_retry(action_fn_builder):
-    """Try each API client in order. On 429/503, rotate to the next key."""
-    for idx, api_client in enumerate(api_clients):
-        key_label = 'primary' if idx == 0 else 'secondary'
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                response = action_fn_builder(api_client)()
-                return response.text
-            except Exception as e:
-                err_str = str(e)
-                if '429' in err_str or 'RESOURCE_EXHAUSTED' in err_str:
-                    # Quota hit — stop retrying this key and try next
-                    print(f"[Quibly] {key_label} key quota exhausted, rotating...")
-                    break
-                elif '503' in err_str or 'UNAVAILABLE' in err_str:
-                    if attempt < max_retries - 1:
-                        time.sleep(1.5 ** (attempt + 1))
-                        continue
-                    break
-                else:
-                    return f"**Error:** {str(e)}"
-
-    return "**Service Unavailable**\n\nAll API keys have hit their quota limit. Please wait a few minutes and try again, or add a new API key."
+    return "**Notice: Groq API Key Not Configured**\n\nPlease add your API key to chat."
 
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze_headline():
     data = request.json
     headline = data.get('headline', '').strip()
-    
+
     if not headline:
         return jsonify({'error': 'Headline is required'}), 400
-        
-    if not api_clients:
+
+    if not client:
         return jsonify({'response': get_fallback_analysis(headline)})
-        
+
     prompt = f"""You are QUIBLY — a sharp, witty AI news analyst who sounds like a brilliant friend who reads every newspaper and also watches too much stand-up comedy.
 
     The user gave you this headline: "{headline}"
@@ -181,15 +146,13 @@ def analyze_headline():
     Rules: Use markdown formatting properly. Keep total response under 350 words. Be genuinely funny in the humor section — no forced laughs."""
 
     try:
-        def _builder(c):
-            def _action():
-                return c.models.generate_content(
-                    model='gemini-2.5-flash-lite',
-                    contents=prompt,
-                )
-            return _action
-        response_text = call_with_retry(_builder)
-        return jsonify({'response': response_text})
+        response = client.chat.completions.create(
+            model='llama-3.3-70b-versatile',
+            messages=[{'role': 'user', 'content': prompt}],
+            max_tokens=1024,
+            temperature=0.7,
+        )
+        return jsonify({'response': response.choices[0].message.content})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -199,36 +162,37 @@ def chat():
     data = request.json
     message = data.get('message', '').strip()
     history = data.get('history', [])
-    
+
     if not message:
         return jsonify({'error': 'Message is required'}), 400
-        
-    if not api_clients:
+
+    if not client:
         return jsonify({'response': get_fallback_chat(message)})
-        
+
     try:
-        # Convert history format
-        formatted_history = []
+        # Build messages list with system prompt + history + new message
+        messages = [
+            {
+                'role': 'system',
+                'content': "You are QUIBLY, an AI-driven news analysis platform with a slightly witty and humorous personality. You provide accurate, context-rich answers about news topics (especially geopolitics, economy, wars, and entertainment) while keeping the tone engaging and lightly humorous."
+            }
+        ]
+
+        # Add conversation history
         for msg in history:
-            role = 'user' if msg['role'] == 'user' else 'model'
-            formatted_history.append(
-                types.Content(role=role, parts=[types.Part.from_text(text=msg['content'])])
-            )
-        
-        def _builder(c):
-            chat_session = c.chats.create(
-                model='gemini-2.5-flash-lite',
-                config=types.GenerateContentConfig(
-                    system_instruction="You are QUIBLY, an AI-driven news analysis platform with a slightly witty and humorous personality. You provide accurate, context-rich answers about news topics (especially geopolitics, economy, wars, and entertainment) while keeping the tone engaging and lightly humorous."
-                ),
-                history=formatted_history
-            )
-            def _action():
-                return chat_session.send_message(message)
-            return _action
-            
-        response_text = call_with_retry(_builder)
-        return jsonify({'response': response_text})
+            role = 'user' if msg['role'] == 'user' else 'assistant'
+            messages.append({'role': role, 'content': msg['content']})
+
+        # Add current message
+        messages.append({'role': 'user', 'content': message})
+
+        response = client.chat.completions.create(
+            model='llama-3.3-70b-versatile',
+            messages=messages,
+            max_tokens=1024,
+            temperature=0.7,
+        )
+        return jsonify({'response': response.choices[0].message.content})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -236,21 +200,20 @@ def chat():
 @app.route('/api/headlines', methods=['GET'])
 def fetch_headlines():
     import random
-    
-    # Specific limits for each source to guarantee diversity (total 20 articles)
+
     feed_configs = [
-        {'url': 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms', 'limit': 6}, # India (approx 30%)
-        {'url': 'http://feeds.bbci.co.uk/news/world/europe/rss.xml', 'limit': 4}, # Europe
-        {'url': 'http://feeds.bbci.co.uk/news/business/rss.xml', 'limit': 4}, # Economy
-        {'url': 'http://feeds.bbci.co.uk/news/world/rss.xml', 'limit': 3}, # Global
-        {'url': 'http://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml', 'limit': 2}, # USA
-        {'url': 'http://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml', 'limit': 1} # Entertainment
+        {'url': 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms', 'limit': 6},
+        {'url': 'http://feeds.bbci.co.uk/news/world/europe/rss.xml', 'limit': 4},
+        {'url': 'http://feeds.bbci.co.uk/news/business/rss.xml', 'limit': 4},
+        {'url': 'http://feeds.bbci.co.uk/news/world/rss.xml', 'limit': 3},
+        {'url': 'http://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml', 'limit': 2},
+        {'url': 'http://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml', 'limit': 1}
     ]
-    
+
     articles = []
     seen_titles = set()
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    
+
     for feed in feed_configs:
         try:
             resp = requests.get(feed['url'], headers=headers, timeout=5)
@@ -261,7 +224,7 @@ def fetch_headlines():
                     title = entry.get('title', '')
                     if title and title not in seen_titles:
                         seen_titles.add(title)
-                        
+
                         image_url = ''
                         if 'media_content' in entry and len(entry.media_content) > 0:
                             image_url = entry.media_content[0].get('url', '')
@@ -272,7 +235,7 @@ def fetch_headlines():
                                 if hasattr(link, 'type') and link.type.startswith('image/'):
                                     image_url = link.href
                                     break
-                                    
+
                         articles.append({
                             'title': title,
                             'link': entry.get('link', ''),
@@ -284,8 +247,7 @@ def fetch_headlines():
                             break
         except Exception:
             continue
-            
-    # Shuffle so the 25% Indian content is naturally interspersed among the others
+
     random.shuffle(articles)
     return jsonify(articles)
 
